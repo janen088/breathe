@@ -1,0 +1,29 @@
+{
+  "name": "呼吸引导",
+  "short_name": "呼吸",
+  "description": "打工人的每日呼吸处方 — 5种呼吸节奏，离线可用",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#2c3e50",
+  "background_color": "#f4f0e8",
+  "orientation": "portrait",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

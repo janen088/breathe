@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="呼吸引导">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>呼吸引导</title>
+<style>
+:root {
+  --bg: #f4f0e8;
+  --bg-light: #faf8f3;
+  --mist: #c8c4bc;
+  --mist-light: #e8e5df;
+  --deep: #2c3e50;
+  --deep-light: #3d556b;
+  --ink: #3a3632;
+  --ink-light: #6b6560;
+  --accent: #8fa4b5;
+  --accent-warm: #b5a48f;
+  --t-slow: 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-med: 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-fast: 0.3s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",Georgia,serif;background:var(--bg);color:var(--ink);min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center}
+
+/* Header */
+.header{width:100%;max-width:420px;padding:48px 24px 0;text-align:center}
+.header h1{font-size:1.4rem;font-weight:300;letter-spacing:.25em;color:var(--deep);margin-bottom:8px}
+.header .sub{font-size:.72rem;color:var(--ink-light);letter-spacing:.12em;font-weight:300}
+
+/* Rhythm Selector */
+.rhythm-selector{width:100%;max-width:420px;padding:32px 20px 0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.rhythm-chip{padding:8px 16px;border-radius:20px;border:1px solid var(--mist-light);background:var(--bg-light);font-family:inherit;font-size:.7rem;letter-spacing:.06em;color:var(--ink-light);cursor:pointer;transition:all var(--t-fast);white-space:nowrap}
+.rhythm-chip:active{transform:scale(.95)}
+.rhythm-chip.active{background:var(--deep);color:var(--bg);border-color:var(--deep)}
+
+/* Canvas Area */
+.breath-area{position:relative;width:100%;max-width:400px;aspect-ratio:1;margin:24px auto 0}
+#breathCanvas{width:100%;height:100%;border-radius:20px}
+.breath-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:10}
+.breath-phase{font-size:1.1rem;color:var(--deep);letter-spacing:.3em;font-weight:300;opacity:.85;transition:opacity var(--t-med)}
+.breath-counter{font-size:2.5rem;color:var(--deep);font-weight:200;margin-top:8px;opacity:.5}
+
+/* Info Card */
+.info-card{width:100%;max-width:380px;margin:20px auto 0;padding:20px 24px;background:var(--bg-light);border:1px solid var(--mist-light);border-radius:14px;text-align:center}
+.info-name{font-size:.82rem;color:var(--deep);letter-spacing:.12em;margin-bottom:8px;font-weight:400}
+.info-desc{font-size:.72rem;line-height:1.8;color:var(--ink-light);font-weight:300}
+.info-pattern{font-size:.65rem;color:var(--mist);margin-top:10px;letter-spacing:.08em}
+
+/* Controls */
+.controls{display:flex;gap:12px;justify-content:center;margin:24px auto 0;padding-bottom:60px}
+.ctrl-btn{padding:10px 24px;border-radius:24px;border:1px solid var(--mist-light);background:var(--bg-light);font-family:inherit;font-size:.75rem;letter-spacing:.1em;color:var(--ink-light);cursor:pointer;transition:all var(--t-fast)}
+.ctrl-btn:active{transform:scale(.95)}
+.ctrl-btn.active{background:var(--deep);color:var(--bg);border-color:var(--deep)}
+
+/* Session complete */
+.session-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(60px);opacity:0;background:var(--deep);color:var(--bg);padding:12px 28px;border-radius:24px;font-size:.75rem;letter-spacing:.08em;pointer-events:none;transition:all var(--t-med)}
+.session-toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+@media(min-width:600px){.breath-area{max-width:360px}.rhythm-selector{max-width:480px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>呼 吸 引 导</h1>
+  <p class="sub">打工人的每日呼吸处方</p>
+</div>
+
+<div class="rhythm-selector" id="rhythmSelector"></div>
+
+<div class="breath-area">
+  <canvas id="breathCanvas"></canvas>
+  <div class="breath-text">
+    <div class="breath-phase" id="breathPhase">选择节奏</div>
+    <div class="breath-counter" id="breathCounter"></div>
+  </div>
+</div>
+
+<div class="info-card" id="infoCard">
+  <div class="info-name" id="infoName">选择一个呼吸节奏</div>
+  <div class="info-desc" id="infoDesc">根据你当前的状态，选择最适合的呼吸模式</div>
+  <div class="info-pattern" id="infoPattern"></div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" id="btnStartStop" onclick="togglePlay()">开始</button>
+  <button class="ctrl-btn" id="btnReset" onclick="resetSession()">重置</button>
+</div>
+
+<div class="session-toast" id="toast"></div>
+
+<script>
+/* ====== RHYTHMS ====== */
+const rhythms = [
+  {
+    id: 'calm',
+    name: '4-7-8 安神法',
+    label: '😴 安神入睡',
+    desc: '经典安神呼吸。适合加班到深夜后大脑仍在高速运转，需要快速切换到休息模式。',
+    pattern: '吸4秒 → 屏7秒 → 呼8秒',
+    phases: [
+      { name: '吸 气', duration: 4 },
+      { name: '屏 息', duration: 7 },
+      { name: '呼 气', duration: 8 },
+    ],
+    cycles: 4,
+    color: { r: 100, g: 140, b: 180 }
+  },
+  {
+    id: 'box',
+    name: '方块呼吸',
+    label: '🧊 冷静聚焦',
+    desc: '海豹突击队同款。适合开会前、述职前、被拉进紧急会议时，快速稳住心率和注意力。',
+    pattern: '吸4秒 → 屏4秒 → 呼4秒 → 屏4秒',
+    phases: [
+      { name: '吸 气', duration: 4 },
+      { name: '屏 息', duration: 4 },
+      { name: '呼 气', duration: 4 },
+      { name: '静 息', duration: 4 },
+    ],
+    cycles: 4,
+    color: { r: 120, g: 160, b: 170 }
+  },
+  {
+    id: 'energize',
+    name: '激活呼吸',
+    label: '⚡ 午后提神',
+    desc: '短促有力的节奏。适合午饭后犯困、下午三点能量低谷、开会打瞌睡前悄悄做。',
+    pattern: '快吸2秒 → 快呼2秒（连续8轮）',
+    phases: [
+      { name: '快 吸', duration: 2 },
+      { name: '快 呼', duration: 2 },
+    ],
+    cycles: 8,
+    color: { r: 180, g: 150, b: 100 }
+  },
+  {
+    id: 'decompress',
+    name: '长呼气减压',
+    label: '💆 下班解压',
+    desc: '延长呼气激活副交感神经。适合下班路上、到家后、或者被甲方/领导气到之后用来降火。',
+    pattern: '吸3秒 → 呼6秒 → 静2秒',
+    phases: [
+      { name: '吸 气', duration: 3 },
+      { name: '呼 气', duration: 6 },
+      { name: '静 息', duration: 2 },
+    ],
+    cycles: 6,
+    color: { r: 130, g: 165, b: 140 }
+  },
+  {
+    id: 'micro',
+    name: '微休息',
+    label: '☕ 工位偷闲',
+    desc: '30秒极速充电。适合连续开会间隙、写代码卡住时、等电梯的碎片时间。',
+    pattern: '吸3秒 → 屏2秒 → 呼4秒',
+    phases: [
+      { name: '吸 气', duration: 3 },
+      { name: '屏 息', duration: 2 },
+      { name: '呼 气', duration: 4 },
+    ],
+    cycles: 3,
+    color: { r: 160, g: 145, b: 165 }
+  }
+];
+
+/* ====== STATE ====== */
+let current = null; // current rhythm
+let playing = false;
+let animFrame = null;
+let phaseIdx = 0;
+let phaseTime = 0;
+let cycleCount = 0;
+let lastTs = 0;
+let particles = [];
+let canvas, ctx, cw, ch;
+
+/* ====== INIT ====== */
+function init() {
+  // Render chips
+  const sel = document.getElementById('rhythmSelector');
+  rhythms.forEach(r => {
+    const chip = document.createElement('button');
+    chip.className = 'rhythm-chip';
+    chip.textContent = r.label;
+    chip.dataset.id = r.id;
+    chip.onclick = () => selectRhythm(r.id);
+    sel.appendChild(chip);
+  });
+
+  // Canvas setup
+  canvas = document.getElementById('breathCanvas');
+  setupCanvas();
+  window.addEventListener('resize', setupCanvas);
+
+  // Default select first
+  selectRhythm('box');
+}
+
+function setupCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  cw = rect.width;
+  ch = rect.height;
+
+  // Recreate particles
+  particles = [];
+  for (let i = 0; i < 50; i++) {
+    particles.push({
+      x: cw/2 + (Math.random()-.5)*60,
+      y: ch/2 + (Math.random()-.5)*60,
+      ox: cw/2 + (Math.random()-.5)*60,
+      oy: ch/2 + (Math.random()-.5)*60,
+      r: Math.random()*2.5+1,
+      speed: Math.random()*.4+.2,
+      angle: Math.random()*Math.PI*2,
+      opacity: Math.random()*.25+.1
+    });
+  }
+
+  if (!animFrame) startRender();
+}
+
+/* ====== RHYTHM SELECTION ====== */
+function selectRhythm(id) {
+  current = rhythms.find(r => r.id === id);
+  // Update chips
+  document.querySelectorAll('.rhythm-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.id === id);
+  });
+  // Update info
+  document.getElementById('infoName').textContent = current.name;
+  document.getElementById('infoDesc').textContent = current.desc;
+  document.getElementById('infoPattern').textContent = current.pattern;
+  // Reset
+  resetSession();
+}
+
+/* ====== PLAY / PAUSE ====== */
+function togglePlay() {
+  if (!current) return;
+  playing = !playing;
+  document.getElementById('btnStartStop').textContent = playing ? '暂停' : '继续';
+  document.getElementById('btnStartStop').classList.toggle('active', playing);
+  if (playing && phaseIdx === 0 && phaseTime === 0) {
+    cycleCount = 0;
+  }
+}
+
+function resetSession() {
+  playing = false;
+  phaseIdx = 0;
+  phaseTime = 0;
+  cycleCount = 0;
+  document.getElementById('btnStartStop').textContent = '开始';
+  document.getElementById('btnStartStop').classList.remove('active');
+  document.getElementById('breathPhase').textContent = '准备开始';
+  document.getElementById('breathCounter').textContent = '';
+}
+
+/* ====== RENDER LOOP ====== */
+function startRender() {
+  lastTs = 0;
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+function renderLoop(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  // Update breath state
+  let breathVal = 0; // 0~1 representing expansion
+  if (playing && current) {
+    phaseTime += dt;
+    const phase = current.phases[phaseIdx];
+    if (phaseTime >= phase.duration) {
+      phaseTime = 0;
+      phaseIdx++;
+      if (phaseIdx >= current.phases.length) {
+        phaseIdx = 0;
+        cycleCount++;
+        if (cycleCount >= current.cycles) {
+          // Session complete
+          playing = false;
+          document.getElementById('btnStartStop').textContent = '开始';
+          document.getElementById('btnStartStop').classList.remove('active');
+          showToast(`✓ ${current.name} · ${current.cycles}轮完成`);
+          phaseIdx = 0;
+          phaseTime = 0;
+          cycleCount = 0;
+        }
+        // Haptic at cycle boundary
+        if (navigator.vibrate) navigator.vibrate([20, 10, 20]);
+      }
+    }
+
+    if (playing) {
+      const phase = current.phases[phaseIdx];
+      const progress = phaseTime / phase.duration;
+      const phaseName = phase.name;
+
+      // Determine breathVal based on phase type
+      if (phaseName.includes('吸')) {
+        breathVal = easeInOut(progress);
+      } else if (phaseName.includes('呼')) {
+        breathVal = 1 - easeInOut(progress);
+      } else if (phaseName.includes('屏')) {
+        breathVal = 1;
+      } else {
+        breathVal = 0;
+      }
+
+      document.getElementById('breathPhase').textContent = phaseName;
+      const remaining = Math.ceil(phase.duration - phaseTime);
+      document.getElementById('breathCounter').textContent = remaining > 0 ? remaining : '';
+    }
+  } else if (!playing && current && cycleCount === 0 && phaseTime === 0) {
+    breathVal = 0.15 + Math.sin(ts / 2000) * 0.1; // idle pulsing
+  }
+
+  // Draw
+  ctx.clearRect(0, 0, cw, ch);
+  const cx = cw / 2, cy = ch / 2;
+  const baseR = 35 + breathVal * 85;
+  const col = current ? current.color : { r: 143, g: 164, b: 181 };
+
+  // Glow layers
+  for (let i = 4; i >= 0; i--) {
+    const r = baseR + i * 22;
+    const alpha = (0.03 - i * 0.005) * (0.5 + breathVal * 0.5);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(${col.r},${col.g},${col.b},${alpha})`);
+    grad.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Core orb
+  const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+  coreGrad.addColorStop(0, `rgba(${col.r},${col.g},${col.b},${0.15 + breathVal * 0.12})`);
+  coreGrad.addColorStop(0.7, `rgba(${col.r},${col.g},${col.b},${0.05 + breathVal * 0.05})`);
+  coreGrad.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+  ctx.beginPath();
+  ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+  ctx.fillStyle = coreGrad;
+  ctx.fill();
+
+  // Particles
+  particles.forEach(p => {
+    const spread = breathVal;
+    const targetX = p.ox + Math.cos(p.angle) * spread * 90;
+    const targetY = p.oy + Math.sin(p.angle) * spread * 90;
+    p.x += (targetX - p.x) * 0.025;
+    p.y += (targetY - p.y) * 0.025;
+    p.angle += p.speed * dt * 0.3;
+    const dist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+    const maxDist = baseR + 50;
+    const alpha = p.opacity * Math.max(0, 1 - dist / maxDist) * (0.4 + breathVal * 0.6);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${col.r},${col.g},${col.b},${alpha})`;
+    ctx.fill();
+  });
+
+  // Cycle indicator (small dots at bottom)
+  if (current && playing) {
+    const totalCycles = current.cycles;
+    const dotR = 3;
+    const dotGap = 12;
+    const startX = cx - ((totalCycles - 1) * dotGap) / 2;
+    for (let i = 0; i < totalCycles; i++) {
+      ctx.beginPath();
+      ctx.arc(startX + i * dotGap, ch - 30, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < cycleCount
+        ? `rgba(${col.r},${col.g},${col.b},0.6)`
+        : `rgba(${col.r},${col.g},${col.b},0.15)`;
+      ctx.fill();
+    }
+  }
+
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+/* ====== TOAST ====== */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ====== GO ====== */
+init();
+
+/* ====== SERVICE WORKER ====== */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
