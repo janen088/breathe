@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="呼吸引导">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>呼吸引导</title>
+<style>
+:root {
+  --bg: #f4f0e8;
+  --bg-light: #faf8f3;
+  --mist: #c8c4bc;
+  --mist-light: #e8e5df;
+  --deep: #2c3e50;
+  --deep-light: #3d556b;
+  --ink: #3a3632;
+  --ink-light: #6b6560;
+  --accent: #8fa4b5;
+  --accent-warm: #b5a48f;
+  --t-slow: 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-med: 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-fast: 0.3s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",Georgia,serif;background:var(--bg);color:var(--ink);min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+
+/* ====== Desktop layout wrapper ====== */
+.app-container{width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;padding:0 16px}
+
+/* Header */
+.header{width:100%;padding:40px 24px 0;text-align:center}
+.header h1{font-size:1.4rem;font-weight:300;letter-spacing:.25em;color:var(--deep);margin-bottom:8px}
+.header .sub{font-size:.72rem;color:var(--ink-light);letter-spacing:.12em;font-weight:300}
+
+/* Rhythm Selector - horizontal scroll on mobile, wrap on desktop */
+.rhythm-selector{width:100%;padding:28px 0 0;display:flex;gap:8px;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;padding-left:4px;padding-right:4px}
+.rhythm-selector::-webkit-scrollbar{display:none}
+.rhythm-chip{padding:8px 16px;border-radius:20px;border:1px solid var(--mist-light);background:var(--bg-light);font-family:inherit;font-size:.72rem;letter-spacing:.06em;color:var(--ink-light);cursor:pointer;transition:all var(--t-fast);white-space:nowrap;flex-shrink:0}
+.rhythm-chip:hover{border-color:var(--mist);color:var(--ink)}
+.rhythm-chip:active{transform:scale(.95)}
+.rhythm-chip.active{background:var(--deep);color:var(--bg);border-color:var(--deep)}
+
+/* Canvas Area - fixed aspect, touch-action locked */
+.breath-area{position:relative;width:100%;max-width:300px;aspect-ratio:1;margin:12px auto 0;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+#breathCanvas{width:100%;height:100%;border-radius:20px;touch-action:none}
+.breath-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:10}
+.breath-phase{font-size:1.1rem;color:var(--deep);letter-spacing:.3em;font-weight:300;opacity:.85;transition:opacity var(--t-med)}
+.breath-counter{font-size:2.8rem;color:var(--deep);font-weight:200;margin-top:8px;opacity:.6}
+
+/* Info Card */
+.info-card{width:100%;max-width:380px;margin:16px auto 0;padding:18px 22px;background:var(--bg-light);border:1px solid var(--mist-light);border-radius:14px;text-align:center}
+.info-name{font-size:.82rem;color:var(--deep);letter-spacing:.12em;margin-bottom:6px;font-weight:400}
+.info-desc{font-size:.72rem;line-height:1.8;color:var(--ink-light);font-weight:300}
+.info-mechanism{display:none}
+.info-meta{margin-top:12px;font-size:.62rem;color:var(--ink-light);letter-spacing:.06em;font-weight:300;opacity:.8}
+
+/* Phase Guide */
+.coach-tip{width:100%;max-width:380px;margin:8px auto 0;text-align:center;pointer-events:none;min-height:1.4em;opacity:0}
+.coach-tip.show{opacity:1}
+.coach-tip p{font-size:.62rem;color:var(--ink-light);letter-spacing:.08em;font-weight:300;line-height:1.6}
+
+/* Explore entry (bottom) */
+.explore-bottom{width:100%;text-align:center;padding:20px 0 24px;cursor:pointer;transition:opacity var(--t-med)}
+.explore-bottom:hover{opacity:1}
+.explore-bottom .explore-label{font-size:.6rem;color:var(--mist);letter-spacing:.2em;font-weight:300;transition:color var(--t-fast)}
+.explore-bottom:hover .explore-label{color:var(--deep-light)}
+.explore-bottom .explore-line{width:32px;height:1px;background:var(--mist-light);margin:10px auto 0;transition:width var(--t-med),background var(--t-med)}
+.explore-bottom:hover .explore-line{width:60px;background:var(--mist)}
+
+/* Controls */
+.controls{display:flex;gap:12px;justify-content:center;margin:20px auto 0;padding-bottom:40px}
+.ctrl-btn{padding:10px 24px;border-radius:24px;border:1px solid var(--mist-light);background:var(--bg-light);font-family:inherit;font-size:.75rem;letter-spacing:.1em;color:var(--ink-light);cursor:pointer;transition:all var(--t-fast)}
+.ctrl-btn:hover{border-color:var(--mist);color:var(--ink)}
+.ctrl-btn:active{transform:scale(.95)}
+.ctrl-btn.active{background:var(--deep);color:var(--bg);border-color:var(--deep)}
+
+/* ====== Guidance Whisper (pre-start + between cycles) ====== */
+.guidance-whisper{position:absolute;bottom:18%;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:8;opacity:0;transition:opacity 1.2s ease}
+.guidance-whisper.show{opacity:1}
+.guidance-whisper p{font-size:.62rem;color:var(--deep-light);letter-spacing:.15em;font-weight:300;line-height:2}
+
+/* ====== Insight (post-cycle micro-knowledge) ====== */
+.cycle-insight{width:100%;max-width:380px;margin:0 auto;text-align:center;opacity:0;max-height:0;overflow:hidden;transition:all 1s ease}
+.cycle-insight.show{opacity:1;max-height:60px;margin-top:12px}
+.cycle-insight p{font-size:.6rem;color:var(--ink-light);letter-spacing:.06em;font-weight:300;font-style:italic}
+
+/* ====== Review Card (post-session) ====== */
+.review-card{width:100%;max-width:380px;margin:0 auto;padding:0 22px;background:var(--bg-light);border:1px solid var(--mist-light);border-left:3px solid var(--accent);border-radius:14px;text-align:left;opacity:0;max-height:0;overflow:hidden;transition:opacity 2s ease, max-height 0.5s ease, padding 0.5s ease, margin 0.5s ease;pointer-events:none}
+.review-card.show{opacity:1;max-height:200px;padding:20px 22px;margin:20px auto 0;pointer-events:all}
+.review-card .review-complete{font-size:.78rem;color:var(--deep);letter-spacing:.08em;font-weight:400;margin-bottom:12px}
+.review-card .review-insight{font-size:.65rem;color:var(--ink-light);font-weight:300;font-style:italic;line-height:2;margin-bottom:14px}
+.review-card .review-btn{display:inline-block;font-family:inherit;font-size:.6rem;color:var(--accent);letter-spacing:.1em;font-weight:300;cursor:pointer;border:none;background:none;padding:0;transition:color var(--t-fast)}
+.review-card .review-btn:hover{color:var(--deep)}
+
+/* ====== Science Overlay (immersive narrative page) ====== */
+.science-overlay{position:fixed;inset:0;z-index:200;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;opacity:0;pointer-events:none;transition:opacity 0.5s ease;display:flex;flex-direction:column;align-items:center}
+.science-overlay.open{opacity:1;pointer-events:all}
+.science-close{position:fixed;top:24px;left:24px;z-index:210;border:none;background:transparent;cursor:pointer;font-size:.65rem;color:var(--mist);letter-spacing:.1em;transition:color var(--t-fast);font-family:inherit}
+.science-close:hover{color:var(--deep)}
+.science-page{width:100%;max-width:480px;padding:60px 28px 80px}
+.science-page .s-hero{text-align:center;padding:40px 0 48px;border-bottom:1px solid var(--mist-light)}
+.science-page .s-hero h2{font-size:1.2rem;font-weight:300;letter-spacing:.2em;color:var(--deep);margin-bottom:16px}
+.science-page .s-hero .s-quote{font-size:.68rem;color:var(--ink-light);font-style:italic;line-height:2;font-weight:300}
+.science-page .s-section{padding:36px 0;border-bottom:1px solid var(--mist-light)}
+.science-page .s-section:last-child{border-bottom:none}
+.science-page .s-section h3{font-size:.78rem;color:var(--deep);letter-spacing:.1em;font-weight:400;margin-bottom:14px}
+.science-page .s-section .s-num{font-size:.55rem;color:var(--mist);letter-spacing:.2em;margin-bottom:8px;font-weight:300}
+.science-page .s-section p{font-size:.68rem;line-height:2.2;color:var(--ink-light);font-weight:300;margin-bottom:12px}
+.science-page .s-section p:last-child{margin-bottom:0}
+.science-page .s-section .s-highlight{color:var(--deep);font-weight:400}
+.science-page .s-cta{text-align:center;padding:40px 0 0}
+.science-page .s-cta p{font-size:.72rem;color:var(--deep-light);letter-spacing:.1em;font-weight:300}
+
+/* Session complete toast */
+.session-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(60px);opacity:0;background:var(--deep);color:var(--bg);padding:12px 28px;border-radius:24px;font-size:.75rem;letter-spacing:.08em;pointer-events:none;transition:all var(--t-med);z-index:100}
+.session-toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ====== Desktop: centered card ====== */
+@media(min-width:600px){
+  body{justify-content:center;padding:40px 0}
+  .app-container{max-width:440px;background:var(--bg-light);border-radius:24px;border:1px solid var(--mist-light);padding:0 32px 40px;box-shadow:0 8px 40px rgba(44,62,80,.04)}
+  .header{padding-top:40px}
+  .breath-area{max-width:300px}
+  .rhythm-selector{flex-wrap:wrap;justify-content:center;overflow-x:visible}
+  .info-card{margin-bottom:0}
+  .science-page{padding:60px 40px 80px}
+}
+
+/* ====== Large desktop: don't stretch absurdly ====== */
+@media(min-width:1200px){
+  .app-container{max-width:460px}
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="header">
+    <h1>呼 吸 引 导</h1>
+    <p class="sub">打工人的每日呼吸处方</p>
+  </div>
+
+  <div class="rhythm-selector" id="rhythmSelector"></div>
+
+  <div class="breath-area">
+    <canvas id="breathCanvas"></canvas>
+    <div class="breath-text">
+      <div class="breath-phase" id="breathPhase">选择节奏</div>
+      <div class="breath-counter" id="breathCounter"></div>
+    </div>
+    <div class="guidance-whisper" id="guidanceWhisper">
+      <p id="guidanceText"></p>
+    </div>
+  </div>
+
+  <!-- Phase guide text (below breath ball, above info card) -->
+  <div class="coach-tip" id="coachTip">
+    <p id="coachTipText"></p>
+  </div>
+
+  <div class="info-card" id="infoCard">
+    <div class="info-name" id="infoName">选择一个呼吸节奏</div>
+    <div class="info-desc" id="infoDesc">根据你当前的状态，选择最适合的呼吸模式</div>
+    <div class="info-mechanism" id="infoMechanism"></div>
+    <div class="info-meta" id="infoMeta"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="btnStartStop" onclick="togglePlay()">开始</button>
+    <button class="ctrl-btn" id="btnReset" onclick="resetSession()">重置</button>
+  </div>
+
+  <!-- Cycle insight (appears between rounds) -->
+  <div class="cycle-insight" id="cycleInsight">
+    <p id="insightText"></p>
+  </div>
+
+  <!-- Review Card (post-session) -->
+  <div class="review-card" id="reviewCard">
+    <div class="review-complete" id="reviewComplete"></div>
+    <div class="review-insight" id="reviewInsight"></div>
+    <button class="review-btn" onclick="openScience()">了解背后的科学 →</button>
+  </div>
+
+  <div class="explore-bottom" onclick="openScience()">
+    <span class="explore-label">了解背后的科学</span>
+    <div class="explore-line"></div>
+  </div>
+</div>
+
+<div class="session-toast" id="toast"></div>
+
+<!-- Science Overlay: immersive narrative -->
+<div class="science-overlay" id="scienceOverlay">
+  <button class="science-close" onclick="closeScience()">← 返回</button>
+  <div class="science-page">
+    <div class="s-hero">
+      <h2>呼 吸 的 力 量</h2>
+      <p class="s-quote">「你每天呼吸两万次。<br>其中有多少次，是你真正在场的？」</p>
+    </div>
+
+    <!-- 壹：科学说服 -->
+    <div class="s-section">
+      <p class="s-num">壹 · 科学怎么说</p>
+      <h3>1分钟就能改变你的神经系统</h3>
+      <p>2023年，斯坦福大学医学院 Huberman Lab 发表了一项随机对照实验：每天5分钟的结构化呼吸练习，在减少日间焦虑、改善睡眠质量和提升正面情绪方面，<span class="s-highlight">效果显著优于等时长的正念冥想</span>。</p>
+      <p>更关键的发现：即使只做1-3分钟，受试者的<span class="s-highlight">心率变异性 HRV</span>——衡量自主神经灵活性的黄金指标——在练习后10分钟内就显著改善。皮质醇水平同步下降。</p>
+      <p>呼吸之所以特殊，是因为它是<span class="s-highlight">唯一可以被意识主动控制的自主神经功能</span>。心跳你控制不了，消化你控制不了，但呼吸——它是你通往自主神经系统的直接入口。</p>
+    </div>
+
+    <!-- 贰：吸气与呼气 -->
+    <div class="s-section">
+      <p class="s-num">贰 · 一呼一吸的秘密</p>
+      <h3>两套截然不同的神经信号</h3>
+      <p><span class="s-highlight">吸气 = 加速。</span>胸腔扩张，心脏获得空间，血压微降，压力感受器检测到变化，交感神经轻微激活——心率上升，警觉度提高。这是身体在说：「准备好了」。</p>
+      <p><span class="s-highlight">呼气 = 减速。</span>胸腔回缩，心脏受轻微压迫，血压微升，迷走神经发送减速信号——心率下降，血管舒张，消化重启，皮质醇开始代谢。这是身体在说：「安全了」。</p>
+      <p>所以规则极简：<span class="s-highlight">想冷静，让呼气比吸气长。想提神，让吸气更有力。</span>这是自主神经系统最基础的调节通路，写在每一本生理学教科书里，不是玄学。</p>
+    </div>
+
+    <!-- 叁：五种节奏 -->
+    <div class="s-section">
+      <p class="s-num">叁 · 为什么是这五种</p>
+      <h3>每种节奏解决一个具体问题</h3>
+      <p><span class="s-highlight">🧊 冷静聚焦 · 吸4 屏4 呼4 静4 · 4轮</span><br>等比节奏稳定自主神经振荡频率，让紊乱的 HRV 回归基线。海豹突击队和 NASA 宇航员在高压环境前的标准操作——不偏交感也不偏副交感，纯粹的「校准」。</p>
+      <p><span class="s-highlight">☕ 工位偷闲 · 吸3 屏2 呼4 · 3轮</span><br>27秒即完成。屏息制造微小 CO₂ 峰值，促使下次呼气更深更彻底。3次循环就能中断压力激素的级联反应，让应激轴快速降调。</p>
+      <p><span class="s-highlight">⚡ 午后提神 · 吸2 呼2 · 8轮</span><br>快节奏等比呼吸温和激活交感神经，促进微量肾上腺素释放，唤醒脑干网状激活系统。比咖啡快，且不透支皮质醇储备。</p>
+      <p><span class="s-highlight">💆 下班解压 · 吸3 呼6 静2 · 6轮</span><br>吸呼比 1:2，最大化迷走神经张力。6秒呼气覆盖完整的心脏减速周期，从「战或逃」干净切换到「休息与消化」。</p>
+      <p><span class="s-highlight">😴 安神入睡 · 吸4 屏7 呼8 · 4轮</span><br>源自 Andrew Weil 博士的调息法改编。7秒屏息让 CO₂ 轻微积累触发困意信号，8秒长呼气将心率压至静息水平，帮助脑电从β波过渡到α波。</p>
+    </div>
+
+    <!-- 肆：常见误区 -->
+    <div class="s-section">
+      <p class="s-num">肆 · 不是深度，是质量</p>
+      <h3>关于「深呼吸」的误解</h3>
+      <p>很多人以为深呼吸就是使劲吸到极限。但研究表明：<span class="s-highlight">决定效果的不是每口气的深度，而是节奏的稳定性、吸呼比例、以及呼吸方式是否正确</span>。</p>
+      <p>过度换气——吸得太多太快——会导致血液 CO₂ 浓度骤降，引发头晕、手麻、胸闷，甚至加重焦虑。这就是为什么恐慌时「深呼吸」的建议经常失败。</p>
+      <p>真正有效的呼吸练习追求：<span class="s-highlight">稳定的节奏 + 合理的比例 + 温柔的力度</span>。不需要吸到极限，不需要憋到缺氧。跟着引导走，让身体自己找到舒适的幅度。</p>
+    </div>
+
+    <!-- 伍：行动 -->
+    <div class="s-section">
+      <p class="s-num">伍 · 开始练习</p>
+      <h3>鼻吸口呼，就这么简单</h3>
+      <p><span class="s-highlight">用鼻子吸气</span>——不需要用力，想象气息从鼻腔向下沉、向两侧展开、向后背填满。三维的扩张，而不是向上耸肩。鼻腔会加温加湿每一口空气，释放一氧化氮帮助肺泡舒展。让气息来找你就好。</p>
+      <p><span class="s-highlight">用嘴巴呼气</span>——嘴唇微微收拢，像吹远处的蜡烛。气流变细变匀，呼气自然拉长。当你听到自己呼出的气是「呼——」而不是「哈！」，力度就对了。比吸气更慢、更轻、更长。</p>
+      <p>选一个适合此刻状态的节奏，跟着光球走。让身体自己体会。</p>
+    </div>
+
+    <!-- 更深一层 -->
+    <div class="s-section s-deeper">
+      <p class="s-num">⬡ · 更深一层</p>
+      <h3>留给好奇的你</h3>
+      <p>一次呼吸牵动的，远比你以为的多。杏仁核的警报在呼气中安静下来，僵住的膈肌在深吸里重新醒过来，垮塌的体态随着核心腹压一点点回正，迷走神经在每个拉长的呼气尾巴里恢复它的张力。情绪、体态、专注、运动、睡眠——都在这一呼一吸里。后续版本，慢慢展开。</p>
+    </div>
+
+    <div class="s-cta" onclick="closeScience()" style="cursor:pointer">
+      <p>现在，回到呼吸。<br><span style="font-size:.55rem;color:var(--mist);letter-spacing:.12em;margin-top:8px;display:inline-block">点击回到练习 ↑</span></p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== RHYTHMS (reordered: 冷静聚焦→工位偷闲→午后提神→下班解压→安神入睡) ====== */
+const rhythms = [
+  {
+    id: 'box',
+    name: '方块呼吸',
+    label: '🧊 冷静聚焦',
+    desc: '海豹突击队同款。适合开会前、述职前、被拉进紧急会议时，快速稳住心率和注意力。',
+    coachTip: '呼吸落入腹部 · 四个节拍等长 · 像在画一个方块',
+    endInsight: '方块呼吸让紊乱的自主神经振荡回归基线——这也是 NASA 宇航员在舱外作业前的标准操作。',
+    pattern: '吸 4 · 屏 4 · 呼 4 · 静 4',
+    cycles: 4,
+    duration: '约 64 秒',
+    phases: [
+      { name: '吸 气', duration: 4, guides: ['鼻子吸气，让气息向下、向两侧打开','继续，气息向后背也填满','吸气，感受三维扩张','最后一轮，吸满'] },
+      { name: '屏 息', duration: 4, guides: ['轻轻屏住呼吸，肩膀放松','保持住，下巴放松','稳住','留住'] },
+      { name: '呼 气', duration: 4, guides: ['嘴巴呼气，比吸气更慢一点','慢慢呼气，不用着急','呼气，一切在变慢','全部放掉'] },
+      { name: '静 息', duration: 4, guides: ['什么都不做，等下一口气自己吸进来','感受几秒的放空','很好','回到自然呼吸'] },
+    ],
+    color: { r: 120, g: 160, b: 170 }
+  },
+  {
+    id: 'micro',
+    name: '微休息',
+    label: '☕ 工位偷闲',
+    desc: '30秒极速充电。适合连续开会间隙、写代码卡住时、等电梯的碎片时间。',
+    coachTip: '轻轻吸 · 短暂停 · 慢慢放',
+    endInsight: '短暂屏息制造的 CO₂ 峰值，让下一次呼气更深更彻底，3次就能中断皮质醇的级联反应。',
+    pattern: '吸 3 · 屏 2 · 呼 4',
+    cycles: 3,
+    duration: '约 27 秒',
+    phases: [
+      { name: '吸 气', duration: 3, guides: ['鼻子吸气，不用太深','再来一次，轻轻的吸','最后一次，吸进来'] },
+      { name: '屏 息', duration: 2, guides: ['轻轻屏住呼吸','留住','待住'] },
+      { name: '呼 气', duration: 4, guides: ['嘴巴呼气，比吸气再长一点','慢慢的呼，肩膀往下沉','全部呼出去，放松'] },
+    ],
+    color: { r: 160, g: 145, b: 165 }
+  },
+  {
+    id: 'energize',
+    name: '激活呼吸',
+    label: '⚡ 午后提神',
+    desc: '短促有力的节奏。适合午饭后犯困、下午三点能量低谷、开会打瞌睡前悄悄做。',
+    coachTip: '节奏快一些 · 有力地吸 · 干脆地呼',
+    endInsight: '等比快速呼吸温和唤醒脑干网状激活系统，比一杯咖啡更快生效，且不透支你的皮质醇储备。',
+    pattern: '吸 2 · 呼 2',
+    cycles: 8,
+    duration: '约 32 秒',
+    phases: [
+      { name: '快 吸', duration: 2, guides: ['鼻子用力吸','再来，吸进来','跟上节奏','吸','吸','吸','吸','吸'] },
+      { name: '快 呼', duration: 2, guides: ['嘴巴呼出去','呼出去','呼出去','呼','呼','呼','呼','呼'] },
+    ],
+    color: { r: 180, g: 150, b: 100 },
+    intensity: 'sharp'
+  },
+  {
+    id: 'decompress',
+    name: '长呼气减压',
+    label: '💆 下班解压',
+    desc: '延长呼气激活副交感神经。适合下班路上、到家后、需要从工作状态平稳过渡到生活节奏时。',
+    coachTip: '吸气简短 · 呼气拉长 · 感受身体变沉',
+    endInsight: '6秒呼气恰好覆盖完整的心脏减速周期，迷走神经在每个拉长的呼气尾巴里恢复张力。',
+    pattern: '吸 3 · 呼 6 · 静 2',
+    cycles: 6,
+    duration: '约 66 秒',
+    phases: [
+      { name: '吸 气', duration: 3, guides: ['鼻子吸气，短一些就好','轻轻吸，为呼气做准备','吸气，短一点','吸','吸','吸'] },
+      { name: '呼 气', duration: 6, guides: ['嘴巴呼气，慢慢拉长，身体开始变沉','拉长呼气，让重力带着你往下','呼气，再长一点','慢慢呼，身体越来越重','慢慢呼，身体越来越重','慢慢呼，身体越来越重'] },
+      { name: '静 息', duration: 2, guides: ['放松感受','不用动','好','','',''] },
+    ],
+    color: { r: 130, g: 165, b: 140 }
+  },
+  {
+    id: 'calm',
+    name: '4-7-8 安神法',
+    label: '😴 安神入睡',
+    desc: '经典安神呼吸。适合加班到深夜后大脑仍在高速运转，需要快速切换到休息模式。',
+    coachTip: '吸到腹部 · 轻轻屏住 · 像吹最远的蜡烛一样呼出',
+    endInsight: '7秒屏息让 CO₂ 轻微积累触发困意，8秒长呼气将心率压至静息水平，脑电开始从β波向α波过渡。',
+    pattern: '吸 4 · 屏 7 · 呼 8',
+    cycles: 4,
+    duration: '约 76 秒',
+    phases: [
+      { name: '吸 气', duration: 4, guides: ['鼻子吸气，气息一路沉到小腹','再吸，向下、向两侧展开','吸气，感受身体在变重','最后一轮，深深吸'] },
+      { name: '屏 息', duration: 7, guides: ['轻轻含住这口气，下巴眼球放松','保持住，肩膀放松','只是轻轻待着','留住'] },
+      { name: '呼 气', duration: 8, guides: ['嘴巴呼气，像吹远处的蜡烛，越慢越好','慢慢呼，让呼气带走所有念头','呼——比上一次更慢','全部呼走，交给身体'] },
+    ],
+    color: { r: 100, g: 140, b: 180 }
+  }
+];
+
+/* ====== STATE ====== */
+let current = null;
+let playing = false;
+let animFrame = null;
+let phaseIdx = 0;
+let phaseTime = 0;
+let cycleCount = 0;
+let lastTs = 0;
+let particles = [];
+let canvas, ctx, cw, ch;
+let bgBrightness = 0; // for background breathing effect
+let smoothBreath = 0; // smoothed breath value with physical lag (like lung elasticity)
+let isFirstRound = true; // track if this is the first round of the session
+let coachTipShown = false; // whether coach tip has been shown this session
+let lastShownPhaseKey = ''; // track phase changes to update guide text
+
+/* ====== INIT ====== */
+function init() {
+  const sel = document.getElementById('rhythmSelector');
+  rhythms.forEach(r => {
+    const chip = document.createElement('button');
+    chip.className = 'rhythm-chip';
+    chip.textContent = r.label;
+    chip.dataset.id = r.id;
+    chip.onclick = () => selectRhythm(r.id);
+    sel.appendChild(chip);
+  });
+
+  canvas = document.getElementById('breathCanvas');
+  setupCanvas();
+  window.addEventListener('resize', setupCanvas);
+
+  // Prevent all touch gestures on canvas area
+  const breathArea = document.querySelector('.breath-area');
+  breathArea.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  breathArea.addEventListener('gesturestart', e => e.preventDefault());
+  breathArea.addEventListener('gesturechange', e => e.preventDefault());
+
+  // Click/tap on orb area to start/pause
+  breathArea.addEventListener('click', () => { if (current) togglePlay(); });
+
+  selectRhythm('box');
+}
+
+function setupCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  cw = rect.width;
+  ch = rect.height;
+
+  particles = [];
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      x: cw/2 + (Math.random()-.5)*80,
+      y: ch/2 + (Math.random()-.5)*80,
+      ox: cw/2 + (Math.random()-.5)*80,
+      oy: ch/2 + (Math.random()-.5)*80,
+      r: Math.random()*2.8+1,
+      speed: Math.random()*.4+.2,
+      angle: Math.random()*Math.PI*2,
+      opacity: Math.random()*.3+.12
+    });
+  }
+
+  if (!animFrame) startRender();
+}
+
+/* ====== RHYTHM SELECTION ====== */
+function selectRhythm(id) {
+  current = rhythms.find(r => r.id === id);
+  document.querySelectorAll('.rhythm-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.id === id);
+  });
+  document.getElementById('infoName').textContent = current.name;
+  document.getElementById('infoDesc').textContent = current.desc;
+  document.getElementById('infoMechanism').textContent = '';
+
+  // Compact meta line: rhythm + rounds + duration all in one
+  const phaseStr = current.phases.map(p => {
+    const label = p.name.replace(/\s/g, '');
+    return `${label}${p.duration}s`;
+  }).join(' · ');
+  document.getElementById('infoMeta').textContent = `${phaseStr}  ︱  ${current.cycles}轮 · ${current.duration}`;
+  resetSession();
+}
+
+/* ====== PLAY / PAUSE ====== */
+function togglePlay() {
+  if (!current) return;
+  playing = !playing;
+  document.getElementById('btnStartStop').textContent = playing ? '暂停' : '继续';
+  document.getElementById('btnStartStop').classList.toggle('active', playing);
+  if (playing && phaseIdx === 0 && phaseTime === 0) {
+    cycleCount = 0;
+    isFirstRound = true;
+    coachTipShown = false;
+    // Hide review card if visible
+    document.getElementById('reviewCard').classList.remove('show');
+    // Show the first phase guide
+    updatePhaseGuide(0);
+  }
+  if (!playing) {
+    hideCoachTip();
+  }
+}
+
+function resetSession() {
+  playing = false;
+  phaseIdx = 0;
+  phaseTime = 0;
+  cycleCount = 0;
+  isFirstRound = true;
+  coachTipShown = false;
+  document.getElementById('btnStartStop').textContent = '开始';
+  document.getElementById('btnStartStop').classList.remove('active');
+  document.getElementById('breathPhase').textContent = '准备开始';
+  document.getElementById('breathCounter').textContent = '';
+  // Hide review card
+  document.getElementById('reviewCard').classList.remove('show');
+  hideCoachTip();
+}
+
+/* ====== PHASE GUIDE ====== */
+function showPhaseGuide(guideText) {
+  const el = document.getElementById('coachTip');
+  const text = document.getElementById('coachTipText');
+  text.textContent = guideText;
+  el.classList.add('show');
+}
+
+function updatePhaseGuide(phaseIdx) {
+  if (!current || !playing) return;
+  const phase = current.phases[phaseIdx];
+  const key = current.id + '-' + phaseIdx + '-' + cycleCount;
+  if (key === lastShownPhaseKey) return; // already showing this
+  lastShownPhaseKey = key;
+  // Get guide text for current cycle (guides array per round)
+  const guides = phase.guides;
+  if (guides) {
+    const idx = Math.min(cycleCount, guides.length - 1);
+    const text = guides[idx];
+    if (text) {
+      showPhaseGuide(text);
+    } else {
+      // Empty string means hide for this round
+      document.getElementById('coachTip').classList.remove('show');
+    }
+  }
+}
+
+function hideCoachTip() {
+  document.getElementById('coachTip').classList.remove('show');
+  lastShownPhaseKey = '';
+}
+
+/* ====== GUIDANCE WHISPER SYSTEM ====== */
+// Pre-start guidance: gentle coaching tips shown before/between breathing
+const guidanceTips = [
+  '鼻吸口呼 · 让空气自然流入',
+  '放松双肩 · 感受腹部的起伏',
+  '不需要用力 · 让呼吸来找你',
+  '嘴巴轻轻张开 · 像吹远处的蜡烛',
+  '注意力放在呼气的尾巴上',
+  '如果走神了 · 温柔地回来就好',
+  '肩膀远离耳朵 · 下巴微收',
+  '呼气时 · 想象身体变得更沉更软',
+];
+let lastGuidanceIdx = -1;
+
+function showGuidance() {
+  const el = document.getElementById('guidanceWhisper');
+  const text = document.getElementById('guidanceText');
+  let idx;
+  do { idx = Math.floor(Math.random() * guidanceTips.length); } while (idx === lastGuidanceIdx);
+  lastGuidanceIdx = idx;
+  text.textContent = guidanceTips[idx];
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function hideGuidance() {
+  document.getElementById('guidanceWhisper').classList.remove('show');
+}
+
+// Cycle insights: micro-knowledge shown after each cycle completes
+const cycleInsights = [
+  '延长呼气时，迷走神经正在向心脏发送「减速」信号',
+  '鼻腔中的一氧化氮能帮助肺泡更高效地吸收氧气',
+  '真正的深呼吸发生在腹部，而不是胸口',
+  '每次屏息都在轻微积累CO₂，帮助你的身体学会放松',
+  '心率变异性（HRV）越高，身体的恢复能力越强',
+  '规律的呼吸节奏能同步大脑的α波，这就是平静的感觉',
+  '膈肌是唯一一块24小时不停工作的骨骼肌',
+  '3分钟的结构化呼吸，效果优于等时长的冥想',
+  '呼气时心率自然下降——每一次呼气都是一次微休息',
+  '肩膀紧张往往意味着你在用辅助肌肉呼吸，而不是膈肌',
+];
+let lastInsightIdx = -1;
+
+function showInsight() {
+  const el = document.getElementById('cycleInsight');
+  const text = document.getElementById('insightText');
+  let idx;
+  do { idx = Math.floor(Math.random() * cycleInsights.length); } while (idx === lastInsightIdx);
+  lastInsightIdx = idx;
+  text.textContent = cycleInsights[idx];
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+/* ====== REVIEW CARD (post-session) ====== */
+function showReviewCard() {
+  if (!current) return;
+  const el = document.getElementById('reviewCard');
+  document.getElementById('reviewComplete').textContent = `✓ ${current.name} · ${current.cycles}轮完成`;
+  document.getElementById('reviewInsight').textContent = current.endInsight;
+  el.classList.add('show');
+}
+
+/* ====== SCIENCE OVERLAY ====== */
+function openScience() {
+  document.getElementById('scienceOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeScience() {
+  document.getElementById('scienceOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ====== RENDER LOOP ====== */
+function startRender() {
+  lastTs = 0;
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+function renderLoop(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  let breathVal = 0;
+  if (playing && current) {
+    phaseTime += dt;
+    const phase = current.phases[phaseIdx];
+    if (phaseTime >= phase.duration) {
+      phaseTime = 0;
+      phaseIdx++;
+      if (phaseIdx >= current.phases.length) {
+        phaseIdx = 0;
+        cycleCount++;
+        // After first cycle completes, no longer first round
+        if (cycleCount >= 1) {
+          isFirstRound = false;
+        }
+        if (cycleCount >= current.cycles) {
+          playing = false;
+          document.getElementById('btnStartStop').textContent = '开始';
+          document.getElementById('btnStartStop').classList.remove('active');
+          hideCoachTip();
+          // Show review card instead of toast
+          setTimeout(() => showReviewCard(), 800);
+          phaseIdx = 0;
+          phaseTime = 0;
+          cycleCount = 0;
+        }
+        // No showInsight() between cycles — practice stays silent
+        if (navigator.vibrate) navigator.vibrate([20, 10, 20]);
+      }
+    }
+
+    if (playing) {
+      const phase = current.phases[phaseIdx];
+      const progress = phaseTime / phase.duration;
+      const phaseName = phase.name;
+      const isSharp = current.intensity === 'sharp';
+
+      if (phaseName.includes('吸')) {
+        if (isSharp) {
+          // Energize: snappy sine, small amplitude (0.3~1.0 of reduced range)
+          breathVal = 0.3 + 0.7 * Math.sin(progress * Math.PI * 0.5);
+        } else {
+          breathVal = inhaleEase(progress);
+        }
+      } else if (phaseName.includes('呼')) {
+        if (isSharp) {
+          // Energize: quick drop back, mirror of inhale
+          breathVal = 0.3 + 0.7 * Math.cos(progress * Math.PI * 0.5);
+        } else {
+          breathVal = 1 - exhaleEase(progress);
+        }
+      } else if (phaseName.includes('屏')) {
+        breathVal = 0.98 + Math.sin(ts * 0.003) * 0.02;
+      } else {
+        breathVal = 0.02 + Math.sin(ts * 0.0025) * 0.02;
+      }
+
+      document.getElementById('breathPhase').textContent = phaseName;
+      const remaining = Math.ceil(phase.duration - phaseTime);
+      document.getElementById('breathCounter').textContent = remaining > 0 ? remaining : '';
+      // Update phase guide on each phase transition
+      updatePhaseGuide(phaseIdx);
+    }
+  } else if (!playing && current && cycleCount === 0 && phaseTime === 0) {
+    // Idle: very slow, deep breathing rhythm (like sleeping)
+    breathVal = 0.12 + Math.sin(ts / 3000) * 0.08;
+  }
+
+  // ====== Mode detection ======
+  const isSharpMode = current && current.intensity === 'sharp';
+
+  // ====== Smooth the breath value — orb has "mass", doesn't teleport ======
+  // Sharp/energize mode: faster follow (lighter lungs, snappier rhythm)
+  // Calm modes: slower follow (deep, elastic lung tissue feel)
+  const smoothRate = isSharpMode ? 0.15 : 0.045;
+  smoothBreath += (breathVal - smoothBreath) * smoothRate;
+
+  // ====== Background brightness: follows breath with deliberate lag (like room mood) ======
+  const targetBg = playing ? breathVal : 0;
+  const bgFollowRate = isSharpMode ? 0.06 : 0.018;
+  bgBrightness += (targetBg - bgBrightness) * bgFollowRate;
+  if (playing) {
+    const bgShift = Math.round(bgBrightness * 8);
+    document.body.style.backgroundColor = `rgb(${244 + bgShift}, ${240 + bgShift}, ${232 + bgShift})`;
+  } else {
+    document.body.style.backgroundColor = '';
+  }
+
+  // ====== Draw ======
+  ctx.clearRect(0, 0, cw, ch);
+  const cx = cw / 2, cy = ch / 2;
+
+  // Energize: smaller orb range (less air volume, quick pumping action)
+  // Others: full range for deep breath visualization
+  const minR = isSharpMode ? 40 : 28;
+  const maxR = isSharpMode ? Math.min(cw, ch) * 0.26 : Math.min(cw, ch) * 0.4;
+  const baseR = minR + smoothBreath * (maxR - minR);
+  const col = current ? current.color : { r: 143, g: 164, b: 181 };
+
+  // Outer glow layers (more visible)
+  for (let i = 5; i >= 0; i--) {
+    const r = baseR + i * 20;
+    const alpha = (0.04 - i * 0.006) * (0.4 + breathVal * 0.6);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(${col.r},${col.g},${col.b},${alpha})`);
+    grad.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Core orb with stronger opacity
+  const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+  coreGrad.addColorStop(0, `rgba(${col.r},${col.g},${col.b},${0.18 + breathVal * 0.18})`);
+  coreGrad.addColorStop(0.6, `rgba(${col.r},${col.g},${col.b},${0.08 + breathVal * 0.08})`);
+  coreGrad.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+  ctx.beginPath();
+  ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+  ctx.fillStyle = coreGrad;
+  ctx.fill();
+
+  // Inner bright core
+  const innerR = baseR * 0.3;
+  const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+  innerGrad.addColorStop(0, `rgba(${Math.min(255,col.r+60)},${Math.min(255,col.g+60)},${Math.min(255,col.b+60)},${0.12 + breathVal * 0.1})`);
+  innerGrad.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fillStyle = innerGrad;
+  ctx.fill();
+
+  // Particles — drift lazily like bubbles in water, not mechanical followers
+  particles.forEach(p => {
+    const spread = breathVal;
+    const targetX = p.ox + Math.cos(p.angle) * spread * 100;
+    const targetY = p.oy + Math.sin(p.angle) * spread * 100;
+    // Very slow follow rate — particles lag behind the breath, creating organic feel
+    const followRate = 0.012 + breathVal * 0.008; // slower when contracted, slightly faster when expanded
+    p.x += (targetX - p.x) * followRate;
+    p.y += (targetY - p.y) * followRate;
+    p.angle += p.speed * dt * 0.2; // slower angular drift too
+    const dist = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+    const maxDist = baseR + 60;
+    const alpha = p.opacity * Math.max(0, 1 - dist / maxDist) * (0.5 + breathVal * 0.5);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * (0.8 + breathVal * 0.4), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${col.r},${col.g},${col.b},${alpha})`;
+    ctx.fill();
+  });
+
+  // Cycle indicator dots
+  if (current && playing) {
+    const totalCycles = current.cycles;
+    const dotR = 3;
+    const dotGap = 12;
+    const startX = cx - ((totalCycles - 1) * dotGap) / 2;
+    for (let i = 0; i < totalCycles; i++) {
+      ctx.beginPath();
+      ctx.arc(startX + i * dotGap, ch - 24, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < cycleCount
+        ? `rgba(${col.r},${col.g},${col.b},0.7)`
+        : `rgba(${col.r},${col.g},${col.b},0.15)`;
+      ctx.fill();
+    }
+  }
+
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+/*
+ * BIOMETRIC BREATHING CURVES
+ * Designed from respiratory physiology principles:
+ *
+ * INHALE (diaphragm descent + rib expansion):
+ *   - Phase 1 (0–30%): Very gentle onset. The diaphragm begins to contract slowly.
+ *     This is where we TEACH people to avoid the sharp gasp / shoulder shrug.
+ *     The curve barely moves — like the first light of dawn.
+ *   - Phase 2 (30–75%): Steady, confident fill. Lungs expand at a comfortable rate.
+ *     The curve steepens but never feels rushed.
+ *   - Phase 3 (75–100%): Approaching total lung capacity. Elastic recoil resistance
+ *     increases, volume gain slows. Curve rounds off — arriving, not slamming.
+ *
+ * EXHALE (passive elastic recoil + gentle abdominal engagement):
+ *   - Phase 1 (0–20%): Noticeable initial release — stored elastic energy lets go.
+ *     Not abrupt, but you feel the "ahhh" of releasing.
+ *   - Phase 2 (20–70%): Steady, decelerating outflow.
+ *   - Phase 3 (70–100%): Very gentle tail, like the last ripple on still water.
+ *     This is what activates the vagus nerve most strongly.
+ */
+
+function inhaleEase(t) {
+  // Custom sigmoid-like curve: slow start, steady middle, soft ceiling
+  // Using a shaped sine: sin(t^0.7 * π/2) gives front-loaded gentleness
+  // Then we blend with a power curve for the soft top
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  // Slow start via t^1.4, then smoothed with sine for natural round-off
+  const shaped = Math.pow(t, 1.4);
+  const rounded = Math.sin(shaped * Math.PI * 0.5);
+  // Blend: 70% sine-shaped (rounder) + 30% direct (ensures full range)
+  return rounded * 0.7 + Math.pow(t, 0.85) * 0.3;
+}
+
+function exhaleEase(t) {
+  // Quick-ish initial release, then long gentle deceleration tail
+  // Models passive elastic recoil: exponential-ish start, logarithmic tail
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  // Use 1-(1-t)^n with n<1 for fast start; blend with sqrt for gentle tail
+  const release = 1 - Math.pow(1 - t, 0.6);  // fast initial release
+  const gentle = Math.pow(t, 0.45);             // gentle logarithmic fill
+  // Blend: early = release-dominant, late = gentle-dominant
+  const blend = t; // linear crossfade
+  return release * (1 - blend * 0.4) + gentle * blend * 0.4;
+}
+
+// Legacy fallback (not used in main loop anymore)
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+/* ====== TOAST ====== */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ====== GO ====== */
+init();
+
+/* ====== SERVICE WORKER ====== */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
